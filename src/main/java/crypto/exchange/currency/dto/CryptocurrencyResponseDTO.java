@@ -1,16 +1,18 @@
 package crypto.exchange.currency.dto;
 
-import lombok.Builder;
 import lombok.Data;
 
-import java.util.HashMap;
+import java.util.Map;
 
 @Data
-@Builder
-public class CryptocurrencyResponseDTO {
+public class CryptocurrencyResponseDTO<T> {
 
-    private String from;
+    private String source;
 
-    private HashMap<String, CryptocurrencyDTO> rates;
+    private Map<String, T> rates;
 
+    public CryptocurrencyResponseDTO(String source, Map<String, T> rates) {
+        this.source = source;
+        this.rates = rates;
+    }
 }

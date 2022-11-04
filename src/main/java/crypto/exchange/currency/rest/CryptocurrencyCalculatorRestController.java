@@ -1,7 +1,7 @@
 package crypto.exchange.currency.rest;
 
 import crypto.exchange.currency.dto.CryptocurrencyRequestDTO;
-import crypto.exchange.currency.dto.CryptocurrencyResponseDTO;
+import crypto.exchange.currency.dto.CryptocurrencyRatesResponseDTO;
 import crypto.exchange.currency.dto.CryptocurrencyQuotesResponseDTO;
 import crypto.exchange.currency.exception.IncorrectInputDataException;
 import crypto.exchange.currency.service.CryptocurrencyCalculatorService;
@@ -62,7 +62,7 @@ public class CryptocurrencyCalculatorRestController {
             @ApiResponse(code = 500, message = "Internal Server Error - not supported exception")
     })
     @PostMapping(value = "/exchange", produces = {MediaType.APPLICATION_JSON_VALUE})
-    public ResponseEntity<CryptocurrencyResponseDTO> getCryptocurrencyForecast(@RequestBody @NonNull final CryptocurrencyRequestDTO request) {
+    public ResponseEntity<CryptocurrencyRatesResponseDTO> getCryptocurrencyForecast(@RequestBody @NonNull final CryptocurrencyRequestDTO request) {
         try {
             return ResponseEntity.ok(cryptoCurrencyCalculatorService.getCryptocurrencyForecast(request));
         } catch (IncorrectInputDataException ex) {

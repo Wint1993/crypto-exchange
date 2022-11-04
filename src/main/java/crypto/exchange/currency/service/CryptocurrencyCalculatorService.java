@@ -3,15 +3,13 @@ package crypto.exchange.currency.service;
 import crypto.exchange.client.CryptoExchangeFeignClient;
 import crypto.exchange.currency.dto.*;
 import crypto.exchange.currency.dto.CryptocurrencyQuotesResponseDTO;
-import crypto.exchange.currency.exception.EmptyListException;
-import crypto.exchange.currency.exception.IncorrectInputDataException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.text.MessageFormat;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -19,96 +17,73 @@ public class CryptocurrencyCalculatorService {
 
     private final static BigDecimal FEE = new BigDecimal("0.01");
 
+    private final CryptocurrencyValidationService cryptocurrencyValidationService;
     private final CryptoExchangeFeignClient client;
 
     private final String apiKey;
 
     @Autowired
-    public CryptocurrencyCalculatorService(final CryptoExchangeFeignClient client,
+    public CryptocurrencyCalculatorService(final CryptocurrencyValidationService cryptocurrencyValidationService,
+                                           final CryptoExchangeFeignClient client,
                                            @Value("${crypto.exchange.api.key}") final String apiKey) {
+        this.cryptocurrencyValidationService = cryptocurrencyValidationService;
         this.client = client;
         this.apiKey = apiKey;
     }
 
     public CryptocurrencyQuotesResponseDTO getQuotesForGivenCryptocurrency(String currency, Set<String> filters) {
-        validateCurrency(currency);
-        CryptoRatesDTO rates = client.getCryptoExchangeForCurrency(apiKey, currency);
-        validateCryptoRates(rates);
-        return CryptocurrencyQuotesResponseDTO.builder()
-                .source(currency)
-                .rates((Objects.isNull(filters) || filters.isEmpty()) ? getResult(rates) : getFilteredResult(filters, rates))
-                .build();
+        cryptocurrencyValidationService.validateCurrency(currency);
+        CryptoRatesDTO rates = getCryptoRates(currency);
+        Map<String, BigDecimal> ratesMap = isFilterEmpty(filters) ? getResult(rates) : getFilteredResult(filters, rates);
+        return new CryptocurrencyQuotesResponseDTO(currency, ratesMap);
+    }
+
+    private boolean isFilterEmpty(Set<String> filters) {
+        return Objects.isNull(filters) || filters.isEmpty();
     }
 
     private Map<String, BigDecimal> getFilteredResult(Set<String> filters, CryptoRatesDTO rates) {
         return rates.getRates()
-                .stream() //TODO lub .parallelStream() jeżeli chcemy wątkowości
+                .parallelStream()
                 .filter(rate -> filters.stream().anyMatch(filter -> filter.equals(rate.getCurrency())))
-                .collect(Collectors.toMap(CryptoRateDTO::getCurrency, CryptoRateDTO::getRate));
+                .collect(Collectors.toConcurrentMap(CryptoRateDTO::getCurrency, CryptoRateDTO::getRate));
     }
 
     private Map<String, BigDecimal> getResult(CryptoRatesDTO rates) {
         return rates.getRates()
-                .stream() //TODO lub .parallelStream() jeżeli chcemy wątkowości
-                .collect(Collectors.toMap(CryptoRateDTO::getCurrency, CryptoRateDTO::getRate));
+                .parallelStream()
+                .collect(Collectors.toConcurrentMap(CryptoRateDTO::getCurrency, CryptoRateDTO::getRate));
     }
 
-    public CryptocurrencyResponseDTO getCryptocurrencyForecast(CryptocurrencyRequestDTO request) {
-        validateInputs(request);
-        CryptoRatesDTO rates = client.getCryptoExchangeForCurrency(apiKey, request.getFromCurrency());
-        validateCryptoRates(rates);
-        HashMap<String, CryptocurrencyDTO> result = new HashMap<>();
-        /*request.getToCurrencySet().stream().forEach(currencyTo -> {*/
-        // TODO: w zadaniu była możliwość uwzględnienia wątkowości, w swojej niedługiej karierze miałem okazję napisać
-        //  kilka wątków lecz nigdy komercyjnie, w pracy nie piszemy wątków. Pozwoliłem sobie użyć featurea javy 8 parallelStream
-        //  ze względu na to, że nie interesuje nas który wątek pierwszy rozpocznie zadanie tylko interesuje nas wynik końcowy,
-        //  który w tym przypadku zawsze będzie taki sam.
+    public CryptocurrencyRatesResponseDTO getCryptocurrencyForecast(CryptocurrencyRequestDTO request) {
+        cryptocurrencyValidationService.validateInputs(request);
+        CryptoRatesDTO rates = getCryptoRates(request.getFromCurrency());
+        Map<String, CryptocurrencyDTO> result = new ConcurrentHashMap<>();
         request.getToCurrencySet().parallelStream().forEach(currencyTo -> {
             rates.getRates()
                     .stream()
                     .filter(rate -> currencyTo.equals(rate.getCurrency()))
                     .findFirst()
                     .ifPresent(rate -> {
-                        addRateToMap(request, result, rate);
+                        result.put(rate.getCurrency(), addRateToMap(request, rate.getRate()));
                     });
         });
 
-        return CryptocurrencyResponseDTO.builder()
-                .from(request.getFromCurrency())
-                .rates(result)
-                .build();
+        return new CryptocurrencyRatesResponseDTO(request.getFromCurrency(), result);
     }
 
-    private void addRateToMap(CryptocurrencyRequestDTO request, HashMap<String, CryptocurrencyDTO> result, CryptoRateDTO rate) {
-        CryptocurrencyDTO currency = CryptocurrencyDTO.builder()
-                .rate(rate.getRate())
+    private CryptoRatesDTO getCryptoRates(String request) {
+        CryptoRatesDTO rates = client.getCryptoExchangeForCurrency(apiKey, request);
+        cryptocurrencyValidationService.validateCryptoRates(rates);
+        return rates;
+    }
+
+    private CryptocurrencyDTO addRateToMap(CryptocurrencyRequestDTO request, BigDecimal rate) {
+        return CryptocurrencyDTO.builder()
+                .rate(rate)
                 .amount(request.getAmount())
-                .result(request.getAmount().multiply(rate.getRate()).add(request.getAmount().multiply(FEE)))
+                .result(request.getAmount().multiply(rate).add(request.getAmount().multiply(FEE).multiply(rate)))
                 .fee(FEE)
                 .build();
-        result.put(rate.getCurrency(), currency);
     }
-
-    private void validateInputs(CryptocurrencyRequestDTO response) {
-        if (Objects.isNull(response.getAmount()) || response.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IncorrectInputDataException(MessageFormat.format("Invalid amount, input amount: {0}", response.getAmount()));
-        }
-        if (Objects.isNull(response.getToCurrencySet()) || response.getToCurrencySet().isEmpty()) {
-            throw new IncorrectInputDataException(MessageFormat.format("Invalid input list to, input to: {0}", response.getToCurrencySet()));
-        }
-        validateCurrency(response.getFromCurrency());
-    }
-
-    private void validateCurrency(String currency) {
-        if (Objects.isNull(currency)) {
-            throw new IncorrectInputDataException("Invalid input currency, currency is null");
-        }
-    }
-
-    private void validateCryptoRates(CryptoRatesDTO rates) {
-        if (Objects.isNull(rates) || Objects.isNull(rates.getRates()) || rates.getRates().isEmpty()) {
-            throw new EmptyListException("Error during get crypto exchange for currency");
-        }
-    }
-
 }
