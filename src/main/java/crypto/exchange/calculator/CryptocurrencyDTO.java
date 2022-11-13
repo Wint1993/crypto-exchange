@@ -1,13 +1,14 @@
-package crypto.exchange.currency.dto;
+package crypto.exchange.calculator;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.Getter;
 
 import java.math.BigDecimal;
 
 @Builder
-@Data
-public class CryptocurrencyDTO {
+@Getter
+class CryptocurrencyDTO {
 
     private BigDecimal rate;
 

@@ -1,4 +1,4 @@
-package crypto.exchange.currency.dto;
+package crypto.exchange.calculator;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
@@ -7,13 +7,13 @@ import java.math.BigDecimal;
 import java.util.Set;
 
 @Data
-public class CryptocurrencyRequestDTO {
+class CryptocurrencyRequestDTO {
 
     @JsonProperty(value = "from")
-    private String fromCurrency;
+    private String currency;
 
     @JsonProperty(value = "to")
-    private Set<String> toCurrencySet;
+    private Set<String> filters;
 
     private BigDecimal amount;
 }
