@@ -5,11 +5,11 @@ import lombok.Getter;
 import java.util.Map;
 
 @Getter
-class AbstractCryptocurrencyResponseDTO<T> {
+abstract class AbstractCryptocurrencyResponseDTO<T> {
 
-    private String source;
+    private final String source;
 
-    private Map<String, T> rates;
+    private final Map<String, T> rates;
 
     AbstractCryptocurrencyResponseDTO(String source, Map<String, T> rates) {
         this.source = source;

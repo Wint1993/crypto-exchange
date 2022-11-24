@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Service
-class CryptocurrencyQuotesCalculatorService extends AbstractCryptocurrencyCalculatorService<CryptocurrencyQuotesResponseDTO, BigDecimal> {
+class CryptocurrencyQuotesCalculatorService extends AbstractCryptocurrencyCalculatorService<CryptocurrencyQuotesResponseDTO, BigDecimal> implements CalculatorTypeStrategy {
 
     @Autowired
     CryptocurrencyQuotesCalculatorService(CryptoRatesService cryptoRatesService) {
@@ -22,12 +22,17 @@ class CryptocurrencyQuotesCalculatorService extends AbstractCryptocurrencyCalcul
     }
 
     @Override
-    public CryptocurrencyQuotesResponseDTO calculate(String currency, Set<String> filters, BigDecimal amount) {
-        return calculateCryptocurrency(currency, filters, amount);
+    protected BigDecimal returnCurrencyResult(BigDecimal rate, BigDecimal amount) {
+        return rate;
     }
 
     @Override
-    protected BigDecimal returnCurrencyResult(BigDecimal rate, BigDecimal amount) {
-        return rate;
+    public CalculatorTypeEnum getCalculatorType() {
+        return CalculatorTypeEnum.QUOTES;
+    }
+
+    @Override
+    public CryptocurrencyQuotesResponseDTO calculateCrypto(String currency, Set<String> filters, BigDecimal amount) {
+        return calculateCryptocurrency(currency, filters, amount);
     }
 }

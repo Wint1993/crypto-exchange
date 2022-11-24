@@ -46,8 +46,6 @@ abstract class AbstractCryptocurrencyCalculatorService<T extends AbstractCryptoc
         return Objects.isNull(filters) || filters.isEmpty();
     }
 
-    protected abstract T calculate(final String currency, final Set<String> filters, final BigDecimal amount);
-
     protected abstract T createResult(final String currency, final Map<String, Y> currencyMap);
 
     protected abstract Y returnCurrencyResult(final BigDecimal rate, final BigDecimal amount);

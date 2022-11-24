@@ -20,15 +20,11 @@ import java.util.Set;
 @RequestMapping("/currencies")
 public class CryptocurrencyRestController {
 
-    private final CryptocurrencyForecastCalculatorService cryptocurrencyForecastCalculatorService;
-
-    private final CryptocurrencyQuotesCalculatorService cryptocurrencyQuotesCalculatorService;
+    private final CurrencyTypeStrategyFactory currencyTypeStrategyFactory;
 
     @Autowired
-    CryptocurrencyRestController(final CryptocurrencyForecastCalculatorService cryptocurrencyForecastCalculatorService,
-                                        final CryptocurrencyQuotesCalculatorService cryptocurrencyQuotesCalculatorService) {
-        this.cryptocurrencyForecastCalculatorService = cryptocurrencyForecastCalculatorService;
-        this.cryptocurrencyQuotesCalculatorService = cryptocurrencyQuotesCalculatorService;
+    CryptocurrencyRestController(final CurrencyTypeStrategyFactory currencyTypeStrategyFactory) {
+        this.currencyTypeStrategyFactory = currencyTypeStrategyFactory;
     }
 
     @ApiOperation(value = "Get quotes for given cryptocurrency",
@@ -46,7 +42,7 @@ public class CryptocurrencyRestController {
         if (Objects.nonNull(validationErrorDTO)) {
             return ResponseEntity.badRequest().body(new BaseApiContractDTO<>(Collections.singletonList(validationErrorDTO)));
         }
-        return ResponseEntity.ok(new BaseApiContractDTO<>(cryptocurrencyQuotesCalculatorService.calculate(currency, filter, null)));
+        return ResponseEntity.ok(new BaseApiContractDTO<>((CryptocurrencyQuotesResponseDTO) this.currencyTypeStrategyFactory.findStrategy(CalculatorTypeEnum.QUOTES).calculateCrypto(currency,filter,null)));
     }
 
     @ApiOperation(value = "Get cryptocurrency forecast",
@@ -64,6 +60,6 @@ public class CryptocurrencyRestController {
         if (!validationErrorDTOList.isEmpty()) {
             return ResponseEntity.badRequest().body(new BaseApiContractDTO<>(validationErrorDTOList));
         }
-        return ResponseEntity.ok(new BaseApiContractDTO<>(cryptocurrencyForecastCalculatorService.calculate(request.getCurrency(), request.getFilters(), request.getAmount())));
+        return ResponseEntity.ok(new BaseApiContractDTO<>((CryptocurrencyForecastResponseDTO) this.currencyTypeStrategyFactory.findStrategy(CalculatorTypeEnum.FORECAST).calculateCrypto(request.getCurrency(), request.getFilters(), request.getAmount())));
     }
 }
